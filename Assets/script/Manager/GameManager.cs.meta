@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 2432c575402acb74f8b14b45abdf91d2
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - pj: {instanceID: 0}
+  - vidas_txt: {instanceID: 0}
+  - monedas_txt: {instanceID: 0}
+  - death_clip: {instanceID: 0}
+  - game_over: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
