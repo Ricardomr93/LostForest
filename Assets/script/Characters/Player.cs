@@ -9,19 +9,29 @@ public class Player : MonoBehaviour
     private int coins;
     private bool dead;
     private bool damage;
-    private AudioSource pj_as;
-
-
-    public GameObject attck_pos;
+    private bool movRig;
+    private bool movLef;
+    private bool attacking;
+    private AudioSource pjAudioSource;
+    private Rigidbody2D rb2d;
+    private float horizMove = 0;
+    private float vertMove = 0;
+    public Joystick joystick;
+    public float runSpeedHorizontal;
+    public float runSpeedVertical;
     public GameObject pj;
     public Animator animator;
-    public float vel_player_lef;
-    public float vel_player_rig;
-    public float vel_player_jump;
-    public Collider2D attack_Col;
-
+    public float velPlayerLef;
+    public float velPlayerRig;
+    public float velPlayerJump;
+    public Collider2D attackCol;
+    public bool realJumping;
+    public float fallMultipler;
+    public float lowMultipler;
+    public AudioSource swordSource;
     //clips
-    public AudioClip jump_clip, attack_clip, hit_clip, run_clip,sword_hit;
+    public AudioClip jumpClip, attackClip, hitClip, coinClip, potionClip;
+    public AudioClip[] runClip;
 
 
 
@@ -43,67 +53,101 @@ public class Player : MonoBehaviour
         set { damage = value; }
     }
 
-
-
+    public bool Dead
+    {
+        get { return dead; }
+        set { dead = value; }
+    }
 
     // Start is called before the first frame update
     void Start()
     {
+        rb2d = GetComponent<Rigidbody2D>();
         coins = 0;
         lives = 3;
         dead = false;
         damage = true;
-        pj_as = GetComponent<AudioSource>();
-        attack_Col.enabled = false;
+        pjAudioSource = GetComponent<AudioSource>();
+        attackCol.enabled = false;
     }
 
     // Update is called once per frame
     void Update()
     {
+        horizMove = joystick.Horizontal * runSpeedHorizontal;
+        vertMove = joystick.Vertical * runSpeedVertical;
+        transform.position += new Vector3(horizMove, 0, 0) * Time.deltaTime * velPlayerRig;
         AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
-        bool attacking = stateInfo.IsName("PJ_Attack");
+        attacking = stateInfo.IsName("PJ_Attack");
 
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
+        if (Input.GetKey(KeyCode.A) || horizMove < 0)
         {
-            Run(-vel_player_lef, true);
+            Run(-velPlayerLef, true);
         }
-        else if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow))
+        else if (Input.GetKey(KeyCode.D) || horizMove > 0)
         {
-            Run(vel_player_rig, false);
+            Run(velPlayerRig, false);
         }
         //no move
         else
         {
-            transform.Translate(new Vector3(-0.01f, 0.0f));
+            rb2d.velocity = new Vector2(-2, rb2d.velocity.y);
             animator.SetBool("Run", false);
         }
 
-        if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
+        //if (Input.GetKey(KeyCode.W) || vertMove > 0 && !jumping)
+        if (vertMove > 0.2 && !jumping)
         {
             Jump();
         }
+        else if (vertMove < 0)
+        {
+
+        }
+        // realJump();
+
         if (Input.GetKeyDown(KeyCode.Space) && !attacking)
         {
-            transform.Translate(new Vector3(-0.1f, 0.0f));
-            animator.SetTrigger("Attack");
-            pj_as.clip = attack_clip;
-            pj_as.Play();
+            Attack();
         }
 
         if (attacking)
         {
-            Debug.Log("Vuelve a recibir daño");
             damage = false;
             Invoke("no_Damage", 2.0f);
-            attack_Col.enabled = true;
-            
-
+            attackCol.enabled = true;
         }
-        else attack_Col.enabled = false;
+        else attackCol.enabled = false;
+        if (rb2d.velocity.y < 0)
+        {
+            animator.SetBool("Falling", true);
+        }
+        else if (rb2d.velocity.y > 0)
+        {
+            animator.SetBool("Falling", false);
+        }
+        //if isn't in the air and is dead
+        if (!jumping && dead)
+        {
+            GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Kinematic;
+        }
+    }
+    void realJump()
+    {
+        if (realJumping)
+        {
+            if (rb2d.velocity.y < 0)
+            {
+                rb2d.velocity += Vector2.up * Physics2D.gravity.y * (fallMultipler) * Time.deltaTime;
+            }
+            if (rb2d.velocity.y > 0 && !Input.GetKey(KeyCode.W))
+            {
+                rb2d.velocity += Vector2.up * Physics2D.gravity.y * (lowMultipler) * Time.deltaTime;
+            }
+        }
     }
     void no_Damage()
     {
-        Debug.Log("Vuelve a recibir daño");
         damage = true;
     }
     void OnCollisionEnter2D(Collision2D _col)
@@ -113,16 +157,22 @@ public class Player : MonoBehaviour
         {
             jumping = false;
             animator.SetBool("Jump", jumping);
+            animator.SetBool("Falling", false);
         }
-        if (_col.gameObject.CompareTag("Enemy") && damage && !dead)
+    }
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.gameObject.CompareTag("Coin") && !dead) coins++;
+        if (collision.gameObject.CompareTag("Potion") && !dead) lives++;
+ 
+        if (collision.gameObject.CompareTag("Enemy") && damage && !dead)
         {
-            Debug.Log("choca contra enemigo");
+            //collision.gameObject.GetComponent<Collider2D>().enabled = false;
             damage = false;
-            Invoke("no_Damage", 2.0f);
+            Invoke("no_Damage", 1.0f);
             lives--;
-            pj_as.clip = hit_clip;
-            pj_as.Play();
-            
+            pjAudioSource.clip = hitClip;
+            pjAudioSource.Play();
             animator.SetTrigger("Hit");
             if (lives <= 0)
             {
@@ -131,37 +181,36 @@ public class Player : MonoBehaviour
             }
         }
     }
-    private void OnTriggerEnter2D(Collider2D collision)
+    public void Attack()
     {
-        if (collision.gameObject.CompareTag("Coin"))
-        {
-            collision.gameObject.SetActive(false);
-            Destroy(collision.gameObject, 0.5f);
-            coins++;
-        }
+        transform.Translate(new Vector3(-0.1f, 0.0f));
+        animator.SetTrigger("Attack");
+        swordSource.Play();
     }
-    private void Jump()
+    public void Jump()
     {
-        if (!jumping && !dead)
+        if (!dead)
         {
-            GetComponent<Rigidbody2D>().AddForce(new Vector2(0.0f, vel_player_jump));
+            rb2d.velocity = new Vector2(rb2d.velocity.x, velPlayerJump);
             jumping = true;
             animator.SetBool("Jump", jumping);
-            pj_as.PlayOneShot(jump_clip);
+            pjAudioSource.PlayOneShot(jumpClip);
         }
     }
     private void Run(float dire, bool flip)
     {
         if (!dead)
         {
-            transform.Translate(new Vector3(dire, 0.0f));
+            rb2d.velocity = new Vector2(dire, rb2d.velocity.y);
             pj.GetComponent<SpriteRenderer>().flipX = flip;
-            if (!pj_as.isPlaying)
+            if (!pjAudioSource.isPlaying && !jumping)
             {
-                pj_as.PlayOneShot(run_clip);
+                var step = Random.Range(0, runClip.Length);
+                pjAudioSource.PlayOneShot(runClip[step]);
+                Debug.Log(step);
             }
             animator.SetBool("Run", true);
         }
-       
+
     }
 }

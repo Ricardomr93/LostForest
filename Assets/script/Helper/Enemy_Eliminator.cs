@@ -7,20 +7,17 @@ public class Enemy_Eliminator : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        
+
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+
     }
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (collision.gameObject.CompareTag("Enemy") || collision.gameObject.CompareTag("Coin"))
-        {
-            collision.gameObject.SetActive(false);
-            Destroy(collision.gameObject, 0.5f);
-        }
+        collision.gameObject.SetActive(false);
+        Destroy(collision.gameObject, 0.5f);
     }
 }
